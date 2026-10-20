@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Разработка SEO-ядра</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <header class="intro">
+        <h1>Разработка SEO-ядра</h1>
+        <p class="lead">
+          Вставьте ссылку на страницу. Агент разберёт её по шагам и соберёт семантическое ядро.
+        </p>
+        <form id="form">
+          <label for="url">Ссылка на страницу</label>
+          <div class="row">
+            <input
+              id="url"
+              name="url"
+              type="url"
+              inputmode="url"
+              required
+              placeholder="https://"
+              autocomplete="url"
+            />
+            <button type="submit" id="submit">Анализировать</button>
+          </div>
+        </form>
+        <p id="status" class="status" aria-live="polite"></p>
+        <p id="error" class="error" hidden></p>
+      </header>
+
+      <div class="work">
+        <section class="pane" aria-labelledby="log-title">
+          <h2 id="log-title">Ход разбора</h2>
+          <div id="log" class="log" aria-live="polite">
+            <p class="empty" id="log-empty">План и шаги появятся здесь.</p>
+          </div>
+        </section>
+        <section class="pane" aria-labelledby="result-title">
+          <h2 id="result-title">SEO-ядро</h2>
+          <article id="result" class="result">
+            <p class="empty" id="result-empty">Готовое ядро появится здесь.</p>
+            <div id="result-body" class="prose" hidden></div>
+          </article>
+        </section>
+      </div>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>
