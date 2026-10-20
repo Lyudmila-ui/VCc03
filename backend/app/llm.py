@@ -47,11 +47,10 @@ def get_client() -> AsyncOpenAI:
         return _client
     key = api_key()
     if not key:
-        raise MissingKey("Не задан OPENAI_API_KEY. Впишите ключ в файл .env и перезапустите контейнеры.")
-    kwargs: dict = {"api_key": key, "timeout": 180.0}
-    if base_url():
-        kwargs["base_url"] = base_url()
-    _client = AsyncOpenAI(**kwargs)
+        raise MissingKey(
+            "Не задан DEEPSEEK_API_KEY. Впишите ключ в файл .env в корне проекта и перезапустите контейнеры."
+        )
+    _client = AsyncOpenAI(api_key=key, base_url=base_url(), timeout=180.0)
     return _client
 
 
@@ -138,18 +137,18 @@ async def complete_with_web(messages: list[dict]) -> str:
     return _response_text(response)
 
 
-def explain_openai_error(exc: Exception) -> str:
+def explain_model_error(exc: Exception) -> str:
     if isinstance(exc, MissingKey):
         return str(exc)
     if isinstance(exc, AuthenticationError):
-        return "Ключ OpenAI не принят. Проверьте OPENAI_API_KEY в файле .env."
+        return "Ключ DeepSeek не принят. Проверьте DEEPSEEK_API_KEY в файле .env."
     text = str(exc)
     lowered = text.lower()
     if "429" in text or "rate limit" in lowered:
-        return "ChatGPT ограничил частоту запросов. Подождите минуту и запустите разбор снова."
+        return "DeepSeek ограничил частоту запросов. Подождите минуту и запустите разбор снова."
     if isinstance(exc, APIConnectionError):
-        return "Нет соединения с API OpenAI. Проверьте сеть и OPENAI_BASE_URL."
-    return f"Запрос к ChatGPT не выполнился: {text[:400]}"
+        return "Нет соединения с API DeepSeek. Проверьте сеть и DEEPSEEK_BASE_URL."
+    return f"Запрос к DeepSeek не выполнился: {text[:400]}"
 
 
 def _response_text(response) -> str:

@@ -26,7 +26,7 @@ async function checkHealth() {
     }
     const data = await response.json();
     if (!data.has_key) {
-      showError("На сервере не задан ключ OpenAI. Впишите OPENAI_API_KEY в файл .env и перезапустите контейнеры.");
+      showError("На сервере не задан ключ DeepSeek. Впишите DEEPSEEK_API_KEY в файл .env и перезапустите контейнеры.");
     }
   } catch {
     showError("Сервер анализа не отвечает.");

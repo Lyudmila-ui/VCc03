@@ -4,10 +4,10 @@ services:
     env_file:
       - .env
     environment:
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
-      OPENAI_HAS_INTERNET: ${OPENAI_HAS_INTERNET:-auto}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_HAS_INTERNET: ${DEEPSEEK_HAS_INTERNET:-false}
     expose:
       - "8000"
     healthcheck:

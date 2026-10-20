@@ -13,7 +13,7 @@ from app.llm import (
     WebSearchUnavailable,
     complete,
     complete_with_web,
-    explain_openai_error,
+    explain_model_error,
     model_has_internet,
 )
 from app.plan import PlanError, Step, parse_plan
@@ -94,11 +94,11 @@ async def run_analysis(url: str) -> AsyncIterator[dict]:
         yield _event("error", {"message": str(exc)})
         return
     except AuthenticationError as exc:
-        yield _event("error", {"message": explain_openai_error(exc)})
+        yield _event("error", {"message": explain_model_error(exc)})
         return
     except Exception as exc:
         logger.exception("Не удалось проверить доступ модели в интернет")
-        yield _event("error", {"message": explain_openai_error(exc)})
+        yield _event("error", {"message": explain_model_error(exc)})
         return
 
     if has_internet:
@@ -106,7 +106,7 @@ async def run_analysis(url: str) -> AsyncIterator[dict]:
     else:
         yield _event(
             "status",
-            {"message": "У модели нет интернета: скачаю страницу и подставлю её текст в шаги."},
+            {"message": "DeepSeek не открывает ссылку сам: скачаю страницу и подставлю её текст в шаги."},
         )
 
     page_text: str | None = None
@@ -127,19 +127,19 @@ async def run_analysis(url: str) -> AsyncIterator[dict]:
             return
         yield _event("status", {"message": f"Текст страницы получен, {len(page_text)} знаков."})
 
-    yield _event("status", {"message": "ChatGPT составляет план анализа."})
+    yield _event("status", {"message": "DeepSeek составляет план анализа."})
     try:
         steps = await plan_task
     except MissingKey as exc:
         yield _event("error", {"message": str(exc)})
         return
     except (PlanError, AuthenticationError) as exc:
-        message = str(exc) if isinstance(exc, PlanError) else explain_openai_error(exc)
+        message = str(exc) if isinstance(exc, PlanError) else explain_model_error(exc)
         yield _event("error", {"message": message})
         return
     except Exception as exc:
         logger.exception("Не удалось получить план")
-        yield _event("error", {"message": explain_openai_error(exc)})
+        yield _event("error", {"message": explain_model_error(exc)})
         return
 
     yield _event(
@@ -169,11 +169,11 @@ async def run_analysis(url: str) -> AsyncIterator[dict]:
             yield _event("error", {"message": str(exc)})
             return
         except AuthenticationError as exc:
-            yield _event("error", {"message": explain_openai_error(exc)})
+            yield _event("error", {"message": explain_model_error(exc)})
             return
         except Exception as exc:
             logger.exception("Шаг %s не выполнился", index)
-            yield _event("error", {"message": explain_openai_error(exc)})
+            yield _event("error", {"message": explain_model_error(exc)})
             return
 
         if note:
@@ -207,7 +207,7 @@ async def run_analysis(url: str) -> AsyncIterator[dict]:
         return
     except Exception as exc:
         logger.exception("Финальная сборка не удалась")
-        yield _event("error", {"message": explain_openai_error(exc)})
+        yield _event("error", {"message": explain_model_error(exc)})
         return
 
     if not core:
