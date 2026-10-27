@@ -14,7 +14,7 @@
 """
 
 import json
-from typing import Callable, List, NamedTuple, Tuple
+from typing import List, NamedTuple
 
 from crewai import Task
 from crewai.task import ConditionalTask
