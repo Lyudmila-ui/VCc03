@@ -5,19 +5,21 @@
     ocr_task -> classification_task -> [ positive_ct | negative_ct ]
 
 Важно по ConditionalTask:
-- условие (condition) — это функция, которой CrewAI передаёт словарь контекста;
-  в ``context["raw"]`` находится строковое представление вывода предыдущей
-  (последней выполненной) задачи — то есть JSON классификации;
-- задача ветки создаётся как обычный Task, а затем оборачивается в
-  ConditionalTask с on_trigger="run", on_false="skip";
-- вторая ветка при ложном условии просто пропускается и не тратит токены.
+- CrewAI вызывает ``task.should_execute(previous_task_output)``, где
+  previous_task_output — объект TaskOutput последней выполненной задачи
+  (то есть классификации). У него есть поля ``pydantic`` (объект нашей модели),
+  ``json_dict`` и ``raw`` (текст) — разбираем устойчиво любое из них;
+- ветка строится напрямую как ConditionalTask (наследник Task): agent,
+  description, expected_output, output_pydantic и context задаются сразу;
+- вторая ветка при ложном условии просто пропускается (CrewAI вставляет
+  пустой TaskOutput) и не тратит токены.
 """
 
 import json
-from typing import List, NamedTuple
+from typing import Any, List, NamedTuple
 
 from crewai import Task
-from crewai.task import ConditionalTask
+from crewai.tasks.conditional_task import ConditionalTask
 
 from review_crew.agents import (
     build_classifier_agent,
@@ -44,30 +46,49 @@ class ReviewTasks(NamedTuple):
     negative: Task
 
 
-def _extract_sentiment(context: dict) -> str:
-    """Достать sentiment из контекста, который CrewAI передаёт в condition().
+def _extract_sentiment(previous_output: Any) -> str:
+    """Достать sentiment из вывода предыдущей задачи (классификации).
 
-    context["raw"] — вывод последней выполненной задачи (классификации).
-    Он может прийти как объект ReviewClassification, как JSON-строка или как
-    произвольный текст — разбираем устойчиво, при неудаче возвращаем "".
+    CrewAI передаёт в condition объект TaskOutput. Надёжнее всего поле
+    ``pydantic`` (уже валидированный ReviewClassification), далее json_dict
+    и raw (текст/JSON-строка). Разбираем устойчиво; при неудаче — "".
     """
-    raw = context.get("raw") if isinstance(context, dict) else None
+    if previous_output is None:
+        return ""
+
+    # 1) Структурированный вывод: pydantic-объект нашей модели.
+    data = getattr(previous_output, "pydantic", None)
+    if isinstance(data, ReviewClassification):
+        return data.sentiment
+    if hasattr(data, "sentiment"):  # на случай другой модели с тем же полем
+        return str(getattr(data, "sentiment", "")).lower()
+
+    # 2) Словарь json_dict.
+    jd = getattr(previous_output, "json_dict", None)
+    if isinstance(jd, dict) and jd:
+        return str(jd.get("sentiment", "")).lower()
+
+    # 3) Текст raw: пробуем распарсить как JSON, иначе ищем ключевое слово.
+    raw = getattr(previous_output, "raw", None)
+    if raw is None and isinstance(previous_output, dict):
+        raw = previous_output.get("raw")
     if raw is None:
         return ""
     if isinstance(raw, ReviewClassification):
         return raw.sentiment
     text = str(raw)
     try:
-        data = json.loads(text)
-        return str(data.get("sentiment", "")).lower()
+        parsed = json.loads(text)
+        if isinstance(parsed, dict):
+            return str(parsed.get("sentiment", "")).lower()
     except Exception:
-        # Fallback: ищем ключевое слово в тексте напрямую.
-        lowered = text.lower()
-        if "positive" in lowered and "negative" not in lowered:
-            return "positive"
-        if "negative" in lowered and "positive" not in lowered:
-            return "negative"
-        return ""
+        pass
+    lowered = text.lower()
+    if "positive" in lowered and "negative" not in lowered:
+        return "positive"
+    if "negative" in lowered and "positive" not in lowered:
+        return "negative"
+    return ""
 
 
 def build_tasks(image_path: str) -> ReviewTasks:
@@ -118,9 +139,19 @@ def build_tasks(image_path: str) -> ReviewTasks:
         context=[ocr_task],
     )
 
+    # ------------------------------------------------------ Условия ветвления
+    def is_positive(previous_output: Any) -> bool:
+        """Условие запуска генерации позитивного контента."""
+        return _extract_sentiment(previous_output) == "positive"
+
+    def is_negative(previous_output: Any) -> bool:
+        """Условие запуска ответа на негативный отзыв."""
+        return _extract_sentiment(previous_output) == "negative"
+
     # ------------------------------------------------------- Ветка POSITIVE
-    positive_task = Task(
+    positive_ct = ConditionalTask(
         agent=positive_agent,
+        condition=is_positive,  # sentiment == 'positive' → выполняем, иначе skip
         description=(
             "Клиент оставил ПОЛОЖИТЕЛЬНЫЙ отзыв (тональность, уверенность и главная\n"
             "эмоция — в контексте задачи, там же распознанный текст отзыва).\n\n"
@@ -145,8 +176,9 @@ def build_tasks(image_path: str) -> ReviewTasks:
     )
 
     # -------------------------------------------------------- Ветка NEGATIVE
-    negative_task = Task(
+    negative_ct = ConditionalTask(
         agent=negative_agent,
+        condition=is_negative,  # sentiment == 'negative' → выполняем, иначе skip
         description=(
             "Клиент оставил НЕГАТИВНЫЙ отзыв (тональность, уверенность и главная\n"
             "эмоция — в контексте задачи, там же распознанный текст отзыва).\n\n"
@@ -166,33 +198,11 @@ def build_tasks(image_path: str) -> ReviewTasks:
         context=[ocr_task, classification_task],
     )
 
-    # ------------------------------------------------------ Условия ветвления
-    def is_positive(context: dict) -> bool:
-        """Условие запуска генерации позитивного контента."""
-        return _extract_sentiment(context) == "positive"
-
-    def is_negative(context: dict) -> bool:
-        """Условие запуска ответа на негативный отзыв."""
-        return _extract_sentiment(context) == "negative"
-
-    positive_ct = ConditionalTask(
-        task=positive_task,
-        condition=is_positive,
-        on_trigger="run",   # sentiment == positive → выполняем задачу
-        on_false="skip",    # иначе — пропускаем
-    )
-    negative_ct = ConditionalTask(
-        task=negative_task,
-        condition=is_negative,
-        on_trigger="run",   # sentiment == negative → выполняем задачу
-        on_false="skip",    # иначе — пропускаем
-    )
-
     return ReviewTasks(
         base=[ocr_task, classification_task],
         conditional=[positive_ct, negative_ct],
         ocr=ocr_task,
         classification=classification_task,
-        positive=positive_task,
-        negative=negative_task,
+        positive=positive_ct,
+        negative=negative_ct,
     )
