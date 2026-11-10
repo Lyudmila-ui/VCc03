@@ -1,6 +1,26 @@
+# Секреты: реальный .env никогда не попадает в репозиторий
 .env
-__pycache__/
-.pytest_cache/
+.env.*
+!.env.example
+
+# Виртуальное окружение
 .venv/
 venv/
+env/
+
+# Python
+__pycache__/
 *.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+
+# IDE / ОС
+.idea/
+.vscode/
+.DS_Store
+
+# Логи и временные файлы
+*.log
+tmp/
